@@ -80,7 +80,8 @@ public:
     CurrentDirectory(const std::string& initialPath) : path(initialPath) {}
 
     // Метод для отображения текущей директории
-    void DisplayCurrentDirectory() {
+    void DisplayCurrentDirectory() 
+    {
         std::cout << "Текущая директория: " << path << std::endl;
     }
 };
@@ -103,7 +104,7 @@ int setDisk(std::string diskPath)
     }
 }
 
-int setFile(std::string filePath)
+int setFile(const fs::path& filePath)
 {   
     std::string extension = filePath.extension().string();
 
@@ -112,14 +113,15 @@ int setFile(std::string filePath)
         std::cout << "Выбран файл " << filePath << std::endl;
     }
 }
-int main() {
+int main() 
+{
     setlocale(LC_ALL, "rus");
 
     // Укажите букву диска, который вы хотите исследовать (например, "C:")
-    std::string diskPath = "/media/andrey";
-    std::string filePath = "/media/andrey/test.txt";
+    std::string diskPath = "/home/andrey/File_Manager_Bukov";
+    std::string filePath = "/home/andrey/File_Manager_Bukov/test.txt";
     setDisk(diskPath);
+    setFile(filePath);
 
-    
     return 0;
 }
