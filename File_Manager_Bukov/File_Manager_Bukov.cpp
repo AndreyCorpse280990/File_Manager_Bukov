@@ -1,62 +1,22 @@
 ﻿#include <iostream>
 #include <string>
-#include <vector>
 #include <filesystem>
+#include <fstream>
 
-namespace fs = std::filesystem;
+namespace fs = std::filesystem;  // Для упрощения обращения к std::filesystem
 
-/* Базовый класс для файлов и папок */
-class FileSystemObject {
-public:
-    std::string getName() const { return name; }
-    std::string getPath() const { return path; }
-
-protected:
-    std::string name;
-    std::string path;
-};
-
-/* Класс для работы с файлами */
-class File : public FileSystemObject {
-public:
-    // Дополнительные методы для работы с файлами
-    std::string readContent() const {
-        // Реализация чтения содержимого файла
-        return "File Content";
-    }
-};
-
-/* Класс для работы с папками */
-class Folder : public FileSystemObject {
-public:
-    // Дополнительные методы для работы с папками
-    std::vector<FileSystemObject> getContents() const {
-        std::vector<FileSystemObject> contents;
-        for (const auto& entry : fs::directory_iterator(path)) {
-            FileSystemObject obj;
-            obj.name = entry.path().filename().u8string();
-            obj.path = entry.path().u8string();
-            contents.push_back(obj);
-        }
-        return contents;
-    }
-};
-
-/* Главный класс для управления файлами и папками */
-class FileManager {
+class FileManager
+{
 public:
     void showContents(const std::string& path) {
-        Folder folder;
-        folder.path = path;
-
         if (fs::exists(path) && fs::is_directory(path)) {
-            std::cout << "Содержимое " << path << ":" << std::endl;
-            for (const auto& obj : folder.getContents()) {
-                std::cout << obj.getName() << std::endl;
+            std::cout << "Содержимое " << path << ":\n";
+            for (const auto& entry : fs::directory_iterator(path)) {
+                std::cout << entry.path().filename().u8string() << std::endl;
             }
         }
         else {
-            std::cout << "Путь " << path << " не существует или не является директорией." << std::endl;
+            std::cout << "Директория " << path << " не существует или не является директорией.\n";
         }
     }
 
@@ -70,29 +30,37 @@ public:
     }
 
     void deleteObject(const std::string& path) {
-        if (fs::exists(path)) {
-            if (fs::is_directory(path)) {
-                fs::remove_all(path);
-            }
-            else {
-                fs::remove(path);
-            }
-        }
+        fs::remove_all(path);
     }
 
-    // Другие методы для управления файлами и папками
+    void rename(const std::string& oldName, const std::string& newName) {
+        fs::rename(oldName, newName);
+    }
 
-    // Методы для других операций, таких как переименование, копирование, перемещение, вычисление размера, поиск и т.д.
+    // Остальные методы по копированию, перемещению, определению размера и поиску могут быть добавлены здесь
 };
 
-int main() {
+class File
+{
+    // Методы и свойства, специфичные для работы с файлами
+};
+
+class Folder
+{
+    // Методы и свойства, специфичные для работы с папками
+};
+
+int main()
+{
+    setlocale(LC_ALL, "rus");
+
+    std::string diskPath = "";
+    std::cout << "Введите имя диска. Например 'C:' - для Windows. '/mnt' - для Linux: " << std::endl;
+    std::cin >> diskPath;
+
     FileManager fileManager;
 
-    // Пример использования методов FileManager
-    fileManager.showContents("C:/"); // Показать содержимое диска C:
-    fileManager.createFolder("C:/", "NewFolder"); // Создать папку "NewFolder" на диске C:
-    fileManager.createFile("C:/", "NewFile.txt"); // Создать файл "NewFile.txt" на диске C:
-    fileManager.deleteObject("C:/NewFile.txt"); // Удалить файл "NewFile.txt" на диске C:
+    fileManager.showContents(diskPath); // Вызов метода для показа содержимого диска
 
     return 0;
 }
