@@ -1,106 +1,98 @@
 ﻿#include <iostream>
 #include <string>
+#include <vector>
 #include <filesystem>
 
-namespace fs = std::filesystem;  // Для упрощения обращения к std::filesystem
+namespace fs = std::filesystem;
 
-// Класс для описания файла
-class File {
-private:
-    std::string NameFile; // имя файла
-    std::string extension; // расширение файла
-    int FileSize;  // размер файла
-    std::string PathFile; // путь к файлу
-    std::string ContentsFile; // Содержимое файла(текстового)
-
+/* Базовый класс для файлов и папок */
+class FileSystemObject {
 public:
-    // Конструктор c параметрами
-    File(const std::string& name, const std::string& extension, int fileSize, const std::string& path, const std::string& contents = "");
+    std::string getName() const { return name; }
+    std::string getPath() const { return path; }
 
-    // Метод для отображения информаии о файле
-    void DisplayInfo();
+protected:
+    std::string name;
+    std::string path;
 };
-// Реализация конструктора c параметрами
-File::File(const std::string& name, const std::string& extension, int fileSize, const std::string& path, const std::string& contents)
-    : NameFile(name), extension(extension), FileSize(fileSize), PathFile(path), ContentsFile(contents) {
-    std::cout << "Конструктор File по умолчанию отработал" << ", по адресу " << this << std::endl;
-}
 
-// Реализация метода для отображения информации о файле
-void File::DisplayInfo() {
-    std::cout << "Имя файла: " << NameFile << std::endl;
-    std::cout << "Расширение файла: " << extension << std::endl;
-    std::cout << "Размер файла: " << FileSize << " байт" << std::endl;
-    std::cout << "Путь к файлу: " << PathFile << std::endl;
-}
-
-// Класс для описания папки
-class Folder {
-private:
-    std::string NameFolder; // имя папки
-    std::string PathFolder; // путь к папке
-
+/* Класс для работы с файлами */
+class File : public FileSystemObject {
 public:
-    // Конструктор c параметрами
-    Folder(const std::string& name, const std::string& path) : NameFolder(name), PathFolder(path) {}
-
-    // Метод для отображения информации о папке
-    void DisplayInfo() {
-        std::cout << "Имя папки: " << NameFolder << std::endl;
-        std::cout << "Путь к папке: " << PathFolder << std::endl;
+    // Дополнительные методы для работы с файлами
+    std::string readContent() const {
+        // Реализация чтения содержимого файла
+        return "File Content";
     }
 };
 
-// Класс для описания диска
-class Disk 
-{
-private:
-    std::string DiskName; // Имя диска
-
+/* Класс для работы с папками */
+class Folder : public FileSystemObject {
 public:
-    // Конструктор c параметрами
-    Disk(const std::string& name) : DiskName(name) {}
-
-    // Метод для отображения информации о диске
-    void DisplayInfo() 
-    {
-        std::cout << "Имя диска: " << DiskName << std::endl;
+    // Дополнительные методы для работы с папками
+    std::vector<FileSystemObject> getContents() const {
+        std::vector<FileSystemObject> contents;
+        for (const auto& entry : fs::directory_iterator(path)) {
+            FileSystemObject obj;
+            obj.name = entry.path().filename().u8string();
+            obj.path = entry.path().u8string();
+            contents.push_back(obj);
+        }
+        return contents;
     }
 };
 
-// Класс для описания текущей директории
-class CurrentDirectory 
-{
-private:
-    std::string path; // Текущая директория
-
+/* Главный класс для управления файлами и папками */
+class FileManager {
 public:
-    // Конструктор для инициализации текущей директории
-    CurrentDirectory(const std::string& initialPath) : path(initialPath) {}
+    void showContents(const std::string& path) {
+        Folder folder;
+        folder.path = path;
 
-    // Метод для отображения текущей директории
-    void DisplayCurrentDirectory() {
-        std::cout << "Текущая директория: " << path << std::endl;
+        if (fs::exists(path) && fs::is_directory(path)) {
+            std::cout << "Содержимое " << path << ":" << std::endl;
+            for (const auto& obj : folder.getContents()) {
+                std::cout << obj.getName() << std::endl;
+            }
+        }
+        else {
+            std::cout << "Путь " << path << " не существует или не является директорией." << std::endl;
+        }
     }
+
+    void createFolder(const std::string& path, const std::string& name) {
+        fs::create_directory(path + "/" + name);
+    }
+
+    void createFile(const std::string& path, const std::string& name) {
+        std::ofstream file(path + "/" + name);
+        file.close();
+    }
+
+    void deleteObject(const std::string& path) {
+        if (fs::exists(path)) {
+            if (fs::is_directory(path)) {
+                fs::remove_all(path);
+            }
+            else {
+                fs::remove(path);
+            }
+        }
+    }
+
+    // Другие методы для управления файлами и папками
+
+    // Методы для других операций, таких как переименование, копирование, перемещение, вычисление размера, поиск и т.д.
 };
 
 int main() {
-    setlocale(LC_ALL, "rus");
+    FileManager fileManager;
 
-    // Укажите букву диска, который вы хотите исследовать (например, "C:")
-    std::string diskPath = "/media/andrey";
-
-    // Проверим, существует ли диск
-    if (fs::exists(diskPath) && fs::is_directory(diskPath)) {
-        std::cout << "Содержимое диска " << diskPath << ":" << std::endl;
-
-        for (const auto& entry : fs::directory_iterator(diskPath)) {
-            std::cout << entry.path().filename().u8string() << std::endl;
-        }
-    } else {
-        std::cout << "Диск " << diskPath << " не существует или не является директорией." << std::endl;
-        
-    }
+    // Пример использования методов FileManager
+    fileManager.showContents("C:/"); // Показать содержимое диска C:
+    fileManager.createFolder("C:/", "NewFolder"); // Создать папку "NewFolder" на диске C:
+    fileManager.createFile("C:/", "NewFile.txt"); // Создать файл "NewFile.txt" на диске C:
+    fileManager.deleteObject("C:/NewFile.txt"); // Удалить файл "NewFile.txt" на диске C:
 
     return 0;
 }

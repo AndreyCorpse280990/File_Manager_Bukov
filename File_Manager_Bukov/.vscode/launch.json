@@ -1,6 +1,18 @@
 {
   "version": "0.2.0",
   "configurations": [
+  {
+    "name": "(Windows) Launch",
+    "type": "cppvsdbg",
+    "request": "launch",
+    "program": "enter program name, for example ${workspaceFolder}/a.exe",
+    "args": [],
+    "stopAtEntry": false,
+    "cwd": "${fileDirname}",
+    "environment": [],
+    "console": "externalTerminal"
+  },
+    
     {
       "type": "lldb",
       "request": "launch",
@@ -61,9 +73,9 @@
       "request": "launch",
       "args": [],
       "stopAtEntry": false,
-      "externalConsole": false,
-      "cwd": "/home/andrey/File_Manager_Bukov/File_Manager_Bukov",
-      "program": "/home/andrey/File_Manager_Bukov/File_Manager_Bukov/build/Release/outRelease",
+      "externalConsole": true,
+      "cwd": "e:/programming/Visual Studio/repos/File_Manager_Bukov/File_Manager_Bukov",
+      "program": "e:/programming/Visual Studio/repos/File_Manager_Bukov/File_Manager_Bukov/build/Release/outRelease",
       "MIMode": "gdb",
       "miDebuggerPath": "gdb",
       "setupCommands": [
