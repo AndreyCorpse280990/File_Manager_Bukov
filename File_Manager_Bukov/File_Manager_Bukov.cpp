@@ -103,7 +103,26 @@ public:
         fs::rename(oldName, newName);
     }
 
-    // Можно добавить другие методы по копированию, перемещению, определению размера и др.
+
+    void readTextFile(const std::string& filePath)
+    {
+        std::ifstream file(filePath);
+        if (file.is_open())
+        {
+            std::string line;
+            std::cout << "\nСодержимое файла " << filePath << ":\n";
+            while (std::getline(file, line))
+            {
+                std::cout << line << std::endl;
+            }
+            file.close();
+        }
+        else
+        {
+            std::cout << "Не удалось открыть файл " << filePath << " для чтения.\n";
+        }
+    }
+    
 };
 
 int main()
@@ -125,6 +144,7 @@ int main()
                   << "3. Создать папку\n"
                   << "4. Удалить объект\n"
                   << "5. Переименовать объект\n"
+                  << "6. Просмотреть содержимое текстового файла\n"
                   << "0. Выход\n";
         std::cin >> choice;
 
@@ -162,6 +182,16 @@ int main()
             fileManager.rename(diskPath + "/" + oldName, diskPath + "/" + newName);
             break;
         }
+        case '6':
+        {
+            std::string fileName;
+            std::cout << "Введите имя файла для просмотра: ";
+            std::cin >> fileName;
+            std::string filePath = diskPath + "/" + fileName;
+            fileManager.readTextFile(filePath);
+            break;
+        }
+        
         case '0':
             std::cout << "Выход из программы.\n";
             break;
