@@ -66,19 +66,59 @@ public:
 class FileManager
 {
 public:
-    void showContents(const std::string& path)
+    void showContents(const std::string& path, bool showSizes = true)
     {
-        if (fs::exists(path) && fs::is_directory(path))
+        try
         {
-            std::cout << "Содержимое " << path << ":\n";
-            for (const auto& entry : fs::directory_iterator(path))
+            if (fs::exists(path) && fs::is_directory(path))
             {
-                std::cout << entry.path().filename().u8string() << std::endl;
+                std::cout << "Содержимое " << path << ":\n";
+
+                for (const auto& entry : fs::directory_iterator(path))
+                {
+                    auto entryPath = entry.path();
+
+                    try
+                    {
+                        std::string entryType = fs::is_directory(entryPath) ? "Папка" : "Файл";
+                        std::cout << entryType << ": " << entryPath.filename().u8string();
+
+                        if (showSizes)
+                        {
+                            if (fs::is_regular_file(entryPath))
+                            {
+                                std::cout << " (Размер: " << fs::file_size(entryPath) << " байт)";
+                            }
+                            else if (fs::is_directory(entryPath))
+                            {
+                                std::cout << " (Размер: " << calculateFolderSize(entryPath) << " байт)";
+                            }
+                        }
+
+                        std::cout << std::endl;
+                    }
+                    catch (const std::exception& e)
+                    {
+                        std::cerr << "Ошибка при обработке файла/папки: " << e.what() << std::endl;
+                    }
+                }
+            }
+            else
+            {
+                std::cout << "Директория " << path << " не существует или не является директорией.\n";
             }
         }
-        else
+        catch (const std::filesystem::filesystem_error& e)
         {
-            std::cout << "Директория " << path << " не существует или не является директорией.\n";
+            std::cerr << "Ошибка работы с файловой системой: " << e.what() << std::endl;
+        }
+        catch (const std::exception& e)
+        {
+            std::cerr << "Необработанное исключение: " << e.what() << std::endl;
+        }
+        catch (...)
+        {
+            std::cerr << "Необработанное неизвестное исключение.\n";
         }
     }
 
@@ -93,16 +133,60 @@ public:
         file.close();
     }
 
-    void deleteObject(const std::string& path)
+
+    void deleteDirectoryContents(const std::string& path)
     {
-        fs::remove_all(path);
+        for (const auto& entry : fs::directory_iterator(path))
+        {
+            try
+            {
+                fs::remove_all(entry.path());
+            }
+            catch (const std::exception& e)
+            {
+                std::cerr << "Ошибка при удалении элемента: " << e.what() << std::endl;
+            }
+        }
     }
+
+
+    void deleteObject(const std::string& path, const std::string& name)
+    {
+        try
+        {
+            std::string objectPath = path + "/" + name;
+
+            if (fs::exists(objectPath))
+            {
+                fs::remove_all(objectPath);
+                std::cout << "Объект успешно удален.\n";
+            }
+            else
+            {
+                std::cout << "Объект " << objectPath << " не существует.\n";
+            }
+        }
+        catch (const std::filesystem::filesystem_error& e)
+        {
+            std::cerr << "Ошибка работы с файловой системой: " << e.what() << std::endl;
+        }
+        catch (const std::exception& e)
+        {
+            std::cerr << "Необработанное исключение: " << e.what() << std::endl;
+        }
+        catch (...)
+        {
+            std::cerr << "Необработанное неизвестное исключение.\n";
+        }
+    }
+
+
+
 
     void rename(const std::string& oldName, const std::string& newName)
     {
         fs::rename(oldName, newName);
     }
-
 
     void readTextFile(const std::string& filePath)
     {
@@ -122,7 +206,21 @@ public:
             std::cout << "Не удалось открыть файл " << filePath << " для чтения.\n";
         }
     }
-    
+
+private:
+    // Вспомогательный метод для расчета размера папки
+    uintmax_t calculateFolderSize(const fs::path& folderPath)
+    {
+        uintmax_t size = 0;
+        for (const auto& entry : fs::recursive_directory_iterator(folderPath))
+        {
+            if (fs::is_regular_file(entry))
+            {
+                size += fs::file_size(entry);
+            }
+        }
+        return size;
+    }
 };
 
 int main()
@@ -139,21 +237,25 @@ int main()
     do
     {
         std::cout << "\nВыберите операцию:\n"
-                  << "1. Показать содержимое директории\n"
-                  << "2. Создать файл\n"
-                  << "3. Создать папку\n"
-                  << "4. Удалить объект\n"
-                  << "5. Переименовать объект\n"
-                  << "6. Просмотреть содержимое текстового файла\n"
-                  << "0. Выход\n";
+            << "1. Показать содержимое директории без размера\n"
+            << "2. Показать содержимое директории с размером\n"
+            << "3. Создать файл\n"
+            << "4. Создать папку\n"
+            << "5. Удалить объект\n"
+            << "6. Переименовать объект\n"
+            << "7. Просмотреть содержимое текстового файла\n"
+            << "0. Выход\n";
         std::cin >> choice;
 
         switch (choice)
         {
         case '1':
-            fileManager.showContents(diskPath);
+            fileManager.showContents(diskPath, false);
             break;
         case '2':
+            fileManager.showContents(diskPath, true);
+            break;
+        case '3':
         {
             std::string fileName;
             std::cout << "Введите имя файла: ";
@@ -161,7 +263,7 @@ int main()
             fileManager.createFile(diskPath, fileName);
             break;
         }
-        case '3':
+        case '4':
         {
             std::string folderName;
             std::cout << "Введите имя папки: ";
@@ -169,10 +271,16 @@ int main()
             fileManager.createFolder(diskPath, folderName);
             break;
         }
-        case '4':
-            fileManager.deleteObject(diskPath);
-            break;
         case '5':
+        {
+            std::string objectName;
+            std::cout << "Введите имя объекта для удаления: ";
+            std::cin >> objectName;
+            fileManager.deleteObject(diskPath, objectName);
+            break;
+        }
+
+        case '6':
         {
             std::string oldName, newName;
             std::cout << "Введите старое имя: ";
@@ -182,7 +290,7 @@ int main()
             fileManager.rename(diskPath + "/" + oldName, diskPath + "/" + newName);
             break;
         }
-        case '6':
+        case '7':
         {
             std::string fileName;
             std::cout << "Введите имя файла для просмотра: ";
@@ -191,7 +299,6 @@ int main()
             fileManager.readTextFile(filePath);
             break;
         }
-        
         case '0':
             std::cout << "Выход из программы.\n";
             break;
