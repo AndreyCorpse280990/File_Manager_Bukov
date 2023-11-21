@@ -282,16 +282,16 @@ public:
         {
             fs::path currentPathObj(currentPath);
 
-            // Используем lexically_normal() для обработки символов маски
+            // lexically_normal() для обработки символов маски
             fs::path searchPath = currentPathObj.lexically_normal();
 
-            // Перебираем файлы в директории
+            
             bool found = false;
             for (const auto& entry : fs::directory_iterator(searchPath))
             {
                 std::string entryName = entry.path().filename().u8string();
 
-                // Сравниваем расширение файла с маской
+                
                 if (entry.path().extension() == mask)
                 {
                     found = true;
