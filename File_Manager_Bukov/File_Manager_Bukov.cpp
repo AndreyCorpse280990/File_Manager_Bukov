@@ -1,8 +1,12 @@
-﻿#include <iostream>
+﻿#include <cstddef>
+#include <iostream>
+#include <iterator>
 #include <string>
 #include <filesystem>
 #include <fstream>
 #include <regex>
+#include <vcruntime_typeinfo.h>
+#include <windows.h> 
 
 
 namespace fs = std::filesystem;
@@ -69,51 +73,166 @@ private:
     std::string currentPath;
 
 public:
+
+    void showAllDrives()
+    {
+        std::vector<std::string> drives;
+
+        // Получение списка логических дисков
+        DWORD drivesMask = GetLogicalDrives();
+        for (char driveLetter = 'A'; driveLetter <= 'Z'; ++driveLetter)
+        {
+            if (drivesMask & 1)
+            {
+                std::string drivePath = std::string(1, driveLetter) + ":\\";
+                drives.push_back(drivePath);
+            }
+            drivesMask >>= 1;
+        }
+
+        // Вывод списка дисков
+        if (!drives.empty())
+        {
+            std::cout << "Доступные диски:\n";
+            for (const auto& drive : drives)
+            {
+                std::cout << drive << std::endl;
+            }
+        }
+        else
+        {
+            std::cout << "Диски не найдены.\n";
+        }
+    }
+
+
+
+    // Проверка корректности имени диска
+    std::string getValidDiskPath()
+    {
+        std::string diskPath;
+        std::cout << "Введите имя диска. Например 'C:' - для Windows. '/mnt' - для Linux: ";
+        std::cin >> diskPath;
+
+        
+        if (!fs::exists(diskPath) || !fs::is_directory(diskPath))
+        {
+            std::cerr << "Ошибка: указанный путь не существует или не является директорией." << std::endl;
+            exit(1);
+        }
+
+    return diskPath;
+    }
+
+    // Метод для смены диска
+    void changeDisk()
+    {
+        std::string newDiskPath = getValidDiskPath();
+        setCurrentPath(newDiskPath);
+        std::cout << "Текущий диск изменен на: " << newDiskPath << std::endl;
+    }
+
+
     // Метод для отображения содержимого директории
     void showContents(bool showSizes = true, const std::string& mask = "")
     {
         try
         {
-            if (fs::exists(currentPath) && fs::is_directory(currentPath))
+            if (!fs::is_empty(currentPath)) // Если папка не пуста
             {
-                std::cout << "Содержимое " << currentPath << ":\n";
-
-                for (const auto& entry : fs::directory_iterator(currentPath))
+                if (fs::exists(currentPath) && fs::is_directory(currentPath))
                 {
-                    auto entryPath = entry.path();
+                    std::cout << "Содержимое " << currentPath << ":\n";
 
-                    // Добавлен фильтр по маске
-                    if (mask.empty() || std::regex_match(entryPath.filename().u8string(), std::regex(mask)))
+                    for (const auto& entry : fs::directory_iterator(currentPath))
                     {
-                        try
-                        {
-                            std::string entryType = fs::is_directory(entryPath) ? "Папка" : "Файл";
-                            std::cout << entryType << ": " << entryPath.filename().u8string();
+                        auto entryPath = entry.path();
 
-                            if (showSizes)
+                        // Добавлен фильтр по маске
+                        if (mask.empty() || std::regex_match(entryPath.filename().u8string(), std::regex(mask)))
+                        {
+                            try
                             {
-                                if (fs::is_regular_file(entryPath))
+                                if (fs::is_directory(entryPath))
                                 {
-                                    std::cout << " (Размер: " << fs::file_size(entryPath) << " байт)";
+                                    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_GREEN );
+                                    std::cout << "Папка: " << entryPath.filename().u8string();
                                 }
-                                else if (fs::is_directory(entryPath))
+                                else
                                 {
-                                    std::cout << " (Размер: " << calculateFolderSize(entryPath) << " байт)";
+                                    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_GREEN | FOREGROUND_RED );
+                                    std::cout << "Файл: " << entryPath.filename().u8string();
                                 }
-                            }
+                                if (showSizes)
+                                {
+                                    if (fs::is_regular_file(entryPath))
+                                    {
+                                        int fileSizeB = fs::file_size(entryPath);
+                                        if (fileSizeB >= 1024 * 1024 * 1024)
+                                        {
+                                            double fileSizeGB = static_cast<double>(fileSizeB) / (1024 * 1024 * 1024);
+                                            std::cout << " (Размер: " << fileSizeGB << " GB)";
+                                        }
+                                        else if (fileSizeB >= 1024 * 1024)
+                                        {
+                                            double fileSizeMB = static_cast<double>(fileSizeB) / (1024 * 1024);
+                                            std::cout << " (Размер: " << fileSizeMB << " MB)";
+                                        }
+                                        else if (fileSizeB >= 1024)
+                                        {
+                                            double fileSizeKB = static_cast<double>(fileSizeB) / 1024;
+                                            std::cout << " (Размер: " << fileSizeKB << " KB)";
+                                        }
+                                        else
+                                        {
+                                            std::cout << " (Размер: " << fileSizeB << " байт)";
+                                        }
+                                    }
+                                    else if (fs::is_directory(entryPath))
+                                    {
+                                        double folderSizeGB = calculateFolderSizeGB(entryPath);
+                                        if (folderSizeGB >= 1.0)
+                                        {
+                                            std::cout << " (Размер: " << folderSizeGB << " GB)";
+                                        }
+                                        else
+                                        {
+                                            double folderSizeMB = folderSizeGB * 1024;
+                                            if (folderSizeMB >= 1.0)
+                                            {
+                                                std::cout << " (Размер: " << folderSizeMB << " MB)";
+                                            }
+                                            else
+                                            {
+                                                uintmax_t folderSizeB = static_cast<uintmax_t>(folderSizeMB * 1024);
+                                                std::cout << " (Размер: " << folderSizeB << " байт)";
+                                            }
+                                        }
+                                    }
+                                }
 
-                            std::cout << std::endl;
-                        }
-                        catch (const std::exception& e)
-                        {
-                            std::cerr << "Ошибка при обработке файла/папки: " << e.what() << std::endl;
+
+
+                                std::cout << std::endl;
+                                SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_GREEN);
+                            }
+                            catch (const std::exception& e)
+                            {
+                                SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED);
+                                std::cerr << "Ошибка при обработке файла/папки: " << e.what() << std::endl;
+                                SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_GREEN);
+                            }
                         }
                     }
+                }
+                else
+                {
+                    std::cout << "Директория " << currentPath << " не существует или не является директорией.\n";
                 }
             }
             else
             {
-                std::cout << "Директория " << currentPath << " не существует или не является директорией.\n";
+                std::cerr << "Папка пустая." << std::endl;
             }
         }
         catch (const std::filesystem::filesystem_error& e)
@@ -142,6 +261,7 @@ public:
         std::ofstream file(currentPath + "/" + name);
         file.close();
     }
+
 
     // Метод для удаления объекта (файла или папки)
     void deleteObject(const std::string& name)
@@ -174,6 +294,7 @@ public:
         }
     }
 
+
     // Метод для переименования объекта (файла или папки)
     void rename(const std::string& oldName, const std::string& newName)
     {
@@ -198,25 +319,44 @@ public:
         }
     }
 
+
     // Метод для чтения текстового файла
     void readTextFile(const std::string& fileName)
     {
-        std::ifstream file(currentPath + "/" + fileName);
-        if (file.is_open())
+        size_t dotPosition = fileName.find_last_of(".");
+        if (dotPosition != std::string::npos)
         {
-            std::string line;
-            std::cout << "\nСодержимое файла " << fileName << ":\n";
-            while (std::getline(file, line))
+            std::string extension = fileName.substr(dotPosition + 1);
+            if (extension == "txt")
             {
-                std::cout << line << std::endl;
+                std::ifstream file(currentPath + "/" + fileName);
+                if (file.is_open())
+                {
+                    std::string line;
+                    std::cout << "\nСодержимое файла " << fileName << ":\n";
+                    while (std::getline(file, line))
+                    {
+                        std::cout << line << std::endl;
+                    }
+                    file.close();
+                }
+                else
+                {
+                    std::cout << "Не удалось открыть файл " << fileName << " для чтения.\n";
+                }
             }
-            file.close();
+            else
+            {
+                std::cout << "Содержимое файла " << fileName << " не .txt. Расширение: " << extension << std::endl;
+            }
         }
         else
         {
-            std::cout << "Не удалось открыть файл " << fileName << " для чтения.\n";
+            std::cout << "Расширение файла не найдено в имени " << fileName << std::endl;
         }
     }
+
+
 
     // Метод для установки текущего пути
     void setCurrentPath(const std::string& path)
@@ -260,19 +400,25 @@ public:
         }
     }
 
-    // Метод для вычисления размера папки
-    uintmax_t calculateFolderSize(const fs::path& folderPath)
+    // Метод для вычисления размера папки в гигабайтах
+    double calculateFolderSizeGB(const fs::path& folderPath)
     {
-        uintmax_t size = 0;
+        uintmax_t sizeBytes = 0;
+
         for (const auto& entry : fs::recursive_directory_iterator(folderPath))
         {
             if (fs::is_regular_file(entry))
             {
-                size += fs::file_size(entry);
+                sizeBytes += fs::file_size(entry);
             }
         }
-        return size;
+
+        double sizeGB = static_cast<double>(sizeBytes) / (1024 * 1024 * 1024);
+        return sizeGB;
     }
+
+
+
 
 
     // поиск по маске
@@ -325,12 +471,13 @@ public:
 int main()
 {
     setlocale(LC_ALL, "rus");
-
-    std::string diskPath = "";
-    std::cout << "Введите имя диска. Например 'C:' - для Windows. '/mnt' - для Linux: ";
-    std::cin >> diskPath;
+    SetConsoleCP(1251);
+    SetConsoleOutputCP(1251);
 
     FileManager fileManager;
+    fileManager.showAllDrives();
+    std::string diskPath = fileManager.getValidDiskPath();
+
     fileManager.setCurrentPath(diskPath);
 
     char choice;
@@ -346,7 +493,8 @@ int main()
             << "7. Просмотреть содержимое текстового файла\n"
             << "8. Перейти в директорию\n"
             << "9. Вернуться в предыдущую директорию\n"
-            << "A. Поиск по маске\n"  // Добавлена новая операция для поиска по маске
+            << "A. Поиск по маске\n"
+            << "D. Сменить диск\n" 
             << "0. Выход\n"
             << "Текущая директория: " << fileManager.getCurrentPath() << std::endl;
         std::cin >> choice;
@@ -420,6 +568,9 @@ int main()
             fileManager.searchByMask(mask);
             break;
         }
+        case 'D':
+            fileManager.changeDisk(); 
+            break;
         case '0':
             std::cout << "Выход из программы.\n";
             break;
