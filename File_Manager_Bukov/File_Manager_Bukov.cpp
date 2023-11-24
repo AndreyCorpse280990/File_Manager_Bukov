@@ -11,60 +11,6 @@
 
 namespace fs = std::filesystem;
 
-// Абстрактный базовый класс для файловой системы
-class FileSystemObject
-{
-public:
-    virtual void display() const = 0;
-    virtual ~FileSystemObject() = default;
-};
-
-// Класс для представления файла
-class File : public FileSystemObject
-{
-private:
-    std::string name;
-    std::string path;
-
-public:
-    File(const std::string& n, const std::string& p) : name(n), path(p) {}
-
-    void display() const override
-    {
-        std::cout << "File: " << name << " at " << path << std::endl;
-    }
-
-    // Метод для создания файла
-    void create()
-    {
-        std::ofstream file(path + "/" + name);
-        file.close();
-        std::cout << "File created" << std::endl;
-    }
-};
-
-// Класс для представления папки
-class Folder : public FileSystemObject
-{
-private:
-    std::string name;
-    std::string path;
-
-public:
-    Folder(const std::string& n, const std::string& p) : name(n), path(p) {}
-
-    void display() const override
-    {
-        std::cout << "Folder: " << name << " at " << path << std::endl;
-    }
-
-    // Метод для создания папки
-    void create()
-    {
-        fs::create_directory(path + "/" + name);
-        std::cout << "Folder created" << std::endl;
-    }
-};
 
 // Класс для управления файловой системой
 class FileManager
@@ -74,6 +20,8 @@ private:
 
 public:
 
+
+    // Вывод списка дисков
     void showAllDrives()
     {
         std::vector<std::string> drives;
@@ -90,7 +38,7 @@ public:
             drivesMask >>= 1;
         }
 
-        // Вывод списка дисков
+
         if (!drives.empty())
         {
             std::cout << "Доступные диски:\n";
@@ -106,22 +54,21 @@ public:
     }
 
 
-
-    // Проверка корректности имени диска
+    // Выбор диска
     std::string getValidDiskPath()
     {
         std::string diskPath;
         std::cout << "Введите имя диска. Например 'C:' - для Windows. '/mnt' - для Linux: ";
         std::cin >> diskPath;
 
-        
+
         if (!fs::exists(diskPath) || !fs::is_directory(diskPath))
         {
             std::cerr << "Ошибка: указанный путь не существует или не является директорией." << std::endl;
             exit(1);
         }
 
-    return diskPath;
+        return diskPath;
     }
 
     // Метод для смены диска
@@ -155,12 +102,12 @@ public:
                             {
                                 if (fs::is_directory(entryPath))
                                 {
-                                    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_GREEN );
+                                    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_GREEN);
                                     std::cout << "Папка: " << entryPath.filename().u8string();
                                 }
                                 else
                                 {
-                                    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_GREEN | FOREGROUND_RED );
+                                    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_GREEN | FOREGROUND_RED);
                                     std::cout << "Файл: " << entryPath.filename().u8string();
                                 }
                                 if (showSizes)
@@ -418,36 +365,34 @@ public:
     }
 
 
-
-
-
-    // поиск по маске
-    void searchByMask(const std::string& mask)
+    // Метод для поиска файлов по маске
+    void searchByMask()
     {
         try
         {
+            std::string mask;
+            std::cout << "Введите маску файла (например, *.txt): ";
+            std::cin >> mask;
             fs::path currentPathObj(currentPath);
 
             // lexically_normal() для обработки символов маски
             fs::path searchPath = currentPathObj.lexically_normal();
 
-            
             bool found = false;
             for (const auto& entry : fs::directory_iterator(searchPath))
             {
                 std::string entryName = entry.path().filename().u8string();
 
-                
-                if (entry.path().extension() == mask)
+                if (fs::is_regular_file(entry) && matchMask(entryName, mask))
                 {
                     found = true;
-                    std::cout << "Найден объект с маской " << mask << ": " << entryName << std::endl;
+                    std::cout << "Найден файл по маске " << mask << ":\n" << entryName << std::endl;
                 }
             }
 
             if (!found)
             {
-                std::cout << "Объекты с маской " << mask << " не найдены в директории " << currentPath << ".\n";
+                std::cout << "Файлы по маске " << mask << " не найдены в директории " << currentPath << ".\n";
             }
         }
         catch (const std::filesystem::filesystem_error& e)
@@ -464,9 +409,119 @@ public:
         }
     }
 
+    // Метод для поиска файлов по маске в подпапках
+    void searchByMaskInSubfolders()
+    {
+        try
+        {
+            std::string mask;
+            std::cout << "Введите маску файла (например, *.txt): ";
+            std::cin >> mask;
+
+            bool found = false;
+            int errorCount = 0;  //  счетчик ошибок
+            int totalCount = 0;  //  счетчик всех файлов
+
+            for (const auto& entry : fs::recursive_directory_iterator(currentPath, fs::directory_options::skip_permission_denied))
+            {
+                try
+                {
+                    std::string entryName = entry.path().filename().u8string();
+
+                    // проверка статуса файла
+                    if (fs::status(entry).permissions() != fs::perms::none &&
+                        fs::is_regular_file(entry) &&
+                        matchMask(entryName, mask))
+                    {
+                        found = true;
+                        std::cout << "Найден файл " << std::endl;
+                        std::cout << "  Имя файла: " << entryName << std::endl;
+                        std::cout << "  Путь: " << fs::relative(entry.path(), currentPath).u8string() << std::endl;
+                        ++totalCount;  // ++ счетчик всех файлов
+                    }
+                }
+                catch (const std::filesystem::filesystem_error& fe)
+                {
+                    // Обработка ошибок файловой системы (например, "Отказано в доступе")
+                    std::cerr << "Ошибка работы с файловой системой: " << fe.what() << std::endl;
+                    ++errorCount;  // ++ счетчик ошибок
+                }
+            }
+
+            if (!found)
+            {
+                std::cout << "Файлы по маске " << mask << " не найдены в подпапках директории " << currentPath << ".\n";
+            }
+
+            std::cout << "Найдено файлов: " << totalCount << std::endl;
+            std::cout << "Не удалось считать из-за ошибок доступа: " << errorCount << std::endl;
+        }
+        catch (const std::filesystem::filesystem_error& e)
+        {
+            std::cerr << "Ошибка работы с файловой системой: " << e.what() << std::endl;
+        }
+        catch (const std::exception& e)
+        {
+            std::cerr << "Необработанное исключение: " << e.what() << std::endl;
+        }
+        catch (...)
+        {
+            std::cerr << "Необработанное неизвестное исключение.\n";
+        }
+    }
+
+
+    // Вспомогательная функция для проверки соответствия строки маске
+    bool matchMask(const std::string& str, const std::string& mask)
+    {
+        size_t i = 0, j = 0;
+        while (i < str.size() && j < mask.size())
+        {
+            if (mask[j] == '*')
+            {
+                size_t k = j + 1;
+                while (k < mask.size() && mask[k] != '*')
+                    ++k;
+
+                size_t len = k - j - 1;
+                if (len == 0) // '*' в маске означает любой символ
+                {
+                    ++j;
+                    continue;
+                }
+
+                size_t pos = str.find(mask.substr(j + 1, len), i);
+                if (pos == std::string::npos)
+                    return false;
+
+                i = pos + len;
+                j = k;
+            }
+            else if (mask[j] == str[i] || mask[j] == '?')
+            {
+                ++i;
+                ++j;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        return (i == str.size() && j == mask.size());
+    }
+
+
+
 
 
 };
+
+
+// Класс для управления дисками
+
+
+
 
 int main()
 {
@@ -494,6 +549,7 @@ int main()
             << "8. Перейти в директорию\n"
             << "9. Вернуться в предыдущую директорию\n"
             << "A. Поиск по маске\n"
+            << "B. Поиск по маске во всех подпапках\n"
             << "D. Сменить диск\n" 
             << "0. Выход\n"
             << "Текущая директория: " << fileManager.getCurrentPath() << std::endl;
@@ -561,15 +617,15 @@ int main()
             fileManager.navigateUp();
             break;
         case 'A':
-        {
-            std::string mask;
-            std::cout << "Введите маску для поиска: ";
-            std::cin >> mask;
-            fileManager.searchByMask(mask);
+            fileManager.searchByMask();
             break;
-        }
+        case 'B':
+            fileManager.searchByMaskInSubfolders();
+            break;
         case 'D':
-            fileManager.changeDisk(); 
+            fileManager.showAllDrives();
+            fileManager.getValidDiskPath();
+            fileManager.changeDisk();
             break;
         case '0':
             std::cout << "Выход из программы.\n";
