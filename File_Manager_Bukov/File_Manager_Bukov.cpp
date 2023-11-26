@@ -1,5 +1,4 @@
-﻿#include <cstddef>
-#include <iostream>
+﻿#include <iostream>
 #include <iterator>
 #include <string>
 #include <filesystem>
@@ -8,25 +7,64 @@
 #include <vcruntime_typeinfo.h>
 #include <windows.h> 
 
-
 namespace fs = std::filesystem;
 
+class FileSystemObject {
+protected:
+    std::string name;
+    fs::path path;
 
-// Класс для управления файловой системой
+public:
+    FileSystemObject(const std::string& name, const fs::path& path)
+        : name(name), path(path) {}
+
+    const std::string& getName() const {
+        return name;
+    }
+
+    const fs::path& getPath() const
+    {
+        return path;
+    }
+
+    virtual void display() const = 0;
+};
+
+class File : public FileSystemObject
+{
+public:
+    File(const std::string& name, const fs::path& path)
+        : FileSystemObject(name, path) {}
+
+    void display() const override
+    {
+        std::cout << "Файл: " << getName() << std::endl;
+    }
+};
+
+class Directory : public FileSystemObject
+{
+public:
+    Directory(const std::string& name, const fs::path& path)
+        : FileSystemObject(name, path) {}
+
+    void display() const override
+    {
+        std::cout << "Папка: " << getName() << std::endl;
+    }
+};
+
 class FileManager
 {
 private:
-    std::string currentPath;
+    fs::path currentPath;
 
 public:
-
-
     // Вывод списка дисков
     void showAllDrives()
     {
         std::vector<std::string> drives;
 
-        // Получение списка логических дисков
         DWORD drivesMask = GetLogicalDrives();
         for (char driveLetter = 'A'; driveLetter <= 'Z'; ++driveLetter)
         {
@@ -38,32 +76,25 @@ public:
             drivesMask >>= 1;
         }
 
-
-        if (!drives.empty())
-        {
+        if (!drives.empty()) {
             std::cout << "Доступные диски:\n";
             for (const auto& drive : drives)
             {
                 std::cout << drive << std::endl;
             }
         }
-        else
-        {
+        else {
             std::cout << "Диски не найдены.\n";
         }
     }
 
-
     // Выбор диска
-    std::string getValidDiskPath()
-    {
+    std::string getValidDiskPath() {
         std::string diskPath;
         std::cout << "Введите имя диска. Например 'C:' - для Windows. '/mnt' - для Linux: ";
         std::cin >> diskPath;
 
-
-        if (!fs::exists(diskPath) || !fs::is_directory(diskPath))
-        {
+        if (!fs::exists(diskPath) || !fs::is_directory(diskPath)) {
             std::cerr << "Ошибка: указанный путь не существует или не является директорией." << std::endl;
             exit(1);
         }
@@ -78,7 +109,6 @@ public:
         setCurrentPath(newDiskPath);
         std::cout << "Текущий диск изменен на: " << newDiskPath << std::endl;
     }
-
 
     // Метод для отображения содержимого директории
     void showContents(bool showSizes = true, const std::string& mask = "")
@@ -166,7 +196,7 @@ public:
                             catch (const std::exception& e)
                             {
                                 SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED);
-                                std::cerr << "Ошибка при обработке файла/папки: " << e.what() << std::endl;
+                                std::cerr << "\tОшибка при обработке файла/папки: " << e.what() << std::endl;
                                 SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_GREEN);
                             }
                         }
@@ -174,7 +204,7 @@ public:
                 }
                 else
                 {
-                    std::cout << "Директория " << currentPath << " не существует или не является директорией.\n";
+                    std::cout << "\tДиректория " << currentPath << " не существует или не является директорией.\n";
                 }
             }
             else
@@ -184,28 +214,28 @@ public:
         }
         catch (const std::filesystem::filesystem_error& e)
         {
-            std::cerr << "Ошибка работы с файловой системой: " << e.what() << std::endl;
+            std::cerr << "\tОшибка работы с файловой системой: " << e.what() << std::endl;
         }
         catch (const std::exception& e)
         {
-            std::cerr << "Необработанное исключение: " << e.what() << std::endl;
+            std::cerr << "\tНеобработанное исключение: " << e.what() << std::endl;
         }
         catch (...)
         {
-            std::cerr << "Необработанное неизвестное исключение.\n";
+            std::cerr << "\tНеобработанное неизвестное исключение.\n";
         }
     }
 
     // Метод для создания папки
     void createFolder(const std::string& name)
     {
-        fs::create_directory(currentPath + "/" + name);
+        fs::create_directory(currentPath.string() + "/" + name);
     }
 
     // Метод для создания файла
     void createFile(const std::string& name)
     {
-        std::ofstream file(currentPath + "/" + name);
+        std::ofstream file(currentPath.string() + "/" + name);
         file.close();
     }
 
@@ -215,7 +245,7 @@ public:
     {
         try
         {
-            std::string objectPath = currentPath + "/" + name;
+            std::string objectPath = currentPath.string() + "/" + name;
 
             if (fs::exists(objectPath))
             {
@@ -247,8 +277,8 @@ public:
     {
         try
         {
-            std::string oldPath = currentPath + "/" + oldName;
-            std::string newPath = currentPath + "/" + newName;
+            std::string oldPath = currentPath.string() + "/" + oldName;
+            std::string newPath = currentPath.string() + "/" + newName;
 
             fs::rename(oldPath, newPath);
         }
@@ -276,7 +306,7 @@ public:
             std::string extension = fileName.substr(dotPosition + 1);
             if (extension == "txt")
             {
-                std::ifstream file(currentPath + "/" + fileName);
+                std::ifstream file(currentPath.string() + "/" + fileName);
                 if (file.is_open())
                 {
                     std::string line;
@@ -303,24 +333,23 @@ public:
         }
     }
 
-
-
     // Метод для установки текущего пути
     void setCurrentPath(const std::string& path)
     {
         currentPath = path;
     }
 
+
     // Метод для получения текущего пути
     std::string getCurrentPath() const
     {
-        return currentPath;
+        return currentPath.string();
     }
 
     // Метод для перехода в директорию
     void navigateToDirectory(const std::string& directoryName)
     {
-        std::string newPath = currentPath + "/" + directoryName;
+        std::string newPath = currentPath.string() + "/" + directoryName;
         if (fs::exists(newPath) && fs::is_directory(newPath))
         {
             currentPath = newPath;
@@ -331,6 +360,7 @@ public:
             std::cout << "Директория " << newPath << " не существует или не является директорией.\n";
         }
     }
+
 
     // Метод для перехода на уровень выше
     void navigateUp()
@@ -397,15 +427,15 @@ public:
         }
         catch (const std::filesystem::filesystem_error& e)
         {
-            std::cerr << "Ошибка работы с файловой системой: " << e.what() << std::endl;
+            std::cerr << "\tОшибка работы с файловой системой: " << e.what() << std::endl;
         }
         catch (const std::exception& e)
         {
-            std::cerr << "Необработанное исключение: " << e.what() << std::endl;
+            std::cerr << "\tНеобработанное исключение: " << e.what() << std::endl;
         }
         catch (...)
         {
-            std::cerr << "Необработанное неизвестное исключение.\n";
+            std::cerr << "\tНеобработанное неизвестное исключение.\n";
         }
     }
 
@@ -452,8 +482,9 @@ public:
             {
                 std::cout << "Файлы по маске " << mask << " не найдены в подпапках директории " << currentPath << ".\n";
             }
-
+            SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 12);
             std::cout << "Найдено файлов: " << totalCount << std::endl;
+            SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 15);
             std::cout << "Не удалось считать из-за ошибок доступа: " << errorCount << std::endl;
         }
         catch (const std::filesystem::filesystem_error& e)
@@ -469,7 +500,6 @@ public:
             std::cerr << "Необработанное неизвестное исключение.\n";
         }
     }
-
 
     // Вспомогательная функция для проверки соответствия строки маске
     bool matchMask(const std::string& str, const std::string& mask)
@@ -511,17 +541,7 @@ public:
         return (i == str.size() && j == mask.size());
     }
 
-
-
-
-
 };
-
-
-// Класс для управления дисками
-
-
-
 
 int main()
 {
@@ -550,7 +570,7 @@ int main()
             << "9. Вернуться в предыдущую директорию\n"
             << "A. Поиск по маске\n"
             << "B. Поиск по маске во всех подпапках\n"
-            << "D. Сменить диск\n" 
+            << "D. Сменить диск\n"
             << "0. Выход\n"
             << "Текущая директория: " << fileManager.getCurrentPath() << std::endl;
         std::cin >> choice;
