@@ -210,18 +210,15 @@ public:
         }
     }
 
-    // Метод для проверки, свободно ли имя файла
-    bool isFileNameAvailable(const std::string& name)
-    {
-        return !fs::exists(currentPath / name);
-    }
 
     // Метод для создания файла
     void createFile(const std::string& name)
     {
-        if (isFileNameAvailable(name))
+        fs::path filePath = currentPath / name; // проверка на занятость имени файла
+
+        if (!fs::exists(filePath))
         {
-            std::ofstream file((currentPath / name).string());
+            std::ofstream file(filePath.string());
             file.close();
             std::cout << "Файл успешно создан.\n";
         }
