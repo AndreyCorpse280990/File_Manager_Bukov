@@ -9,56 +9,34 @@
 
 namespace fs = std::filesystem;
 
-class FileSystemObject {
+class Path
+{
 protected:
-    std::string name;
-    fs::path path;
-
-public:
-    FileSystemObject(const std::string& name, const fs::path& path)
-        : name(name), path(path) {}
-
-    const std::string& getName() const {
-        return name;
-    }
-
-    const fs::path& getPath() const
-    {
-        return path;
-    }
-
-    virtual void display() const = 0;
-};
-
-class File : public FileSystemObject
-{
-public:
-    File(const std::string& name, const fs::path& path)
-        : FileSystemObject(name, path) {}
-
-    void display() const override
-    {
-        std::cout << "Файл: " << getName() << std::endl;
-    }
-};
-
-class Directory : public FileSystemObject
-{
-public:
-    Directory(const std::string& name, const fs::path& path)
-        : FileSystemObject(name, path) {}
-
-    void display() const override
-    {
-        std::cout << "Папка: " << getName() << std::endl;
-    }
-};
-
-class FileManager
-{
-private:
     fs::path currentPath;
 
+public:
+    // Метод для установки текущего пути
+    void setCurrentPath(const std::string& path)
+    {
+        currentPath = path;
+    }
+
+
+    // Метод для получения текущего пути
+    std::string getCurrentPath() const
+    {
+        return currentPath.string();
+    }
+
+    // Метод для создания папки
+    void createFolder(const std::string& name)
+    {
+        fs::create_directory(currentPath.string() + "/" + name);
+    }
+};
+
+class DiskManager : public Path
+{
 public:
     // Вывод списка дисков
     void showAllDrives()
@@ -110,6 +88,12 @@ public:
         std::cout << "Текущий диск изменен на: " << newDiskPath << std::endl;
     }
 
+
+};
+
+class FileManager : public DiskManager
+{
+public:
     // Метод для отображения содержимого директории
     void showContents(bool showSizes = true, const std::string& mask = "")
     {
@@ -226,31 +210,49 @@ public:
         }
     }
 
-    // Метод для создания папки
-    void createFolder(const std::string& name)
+    // Метод для проверки, свободно ли имя файла
+    bool isFileNameAvailable(const std::string& name)
     {
-        fs::create_directory(currentPath.string() + "/" + name);
+        return !fs::exists(currentPath / name);
     }
 
     // Метод для создания файла
     void createFile(const std::string& name)
     {
-        std::ofstream file(currentPath.string() + "/" + name);
-        file.close();
+        if (isFileNameAvailable(name))
+        {
+            std::ofstream file((currentPath / name).string());
+            file.close();
+            std::cout << "Файл успешно создан.\n";
+        }
+        else
+        {
+            std::cout << "Файл с именем " << name << " уже существует. Выберите другое имя.\n";
+        }
     }
-
 
     // Метод для удаления объекта (файла или папки)
     void deleteObject(const std::string& name)
     {
         try
         {
-            std::string objectPath = currentPath.string() + "/" + name;
+            std::string objectPath = (currentPath / name).string();
 
             if (fs::exists(objectPath))
             {
-                fs::remove_all(objectPath);
-                std::cout << "Объект успешно удален.\n";
+                std::cout << "Вы уверены, что хотите удалить объект " << objectPath << "? (y/n): ";
+                char confirmation;
+                std::cin >> confirmation;
+
+                if (confirmation == 'y' || confirmation == 'Y')
+                {
+                    fs::remove_all(objectPath);
+                    std::cout << "Объект успешно удален.\n";
+                }
+                else
+                {
+                    std::cout << "Удаление отменено.\n";
+                }
             }
             else
             {
@@ -272,6 +274,7 @@ public:
     }
 
 
+
     // Метод для переименования объекта (файла или папки)
     void rename(const std::string& oldName, const std::string& newName)
     {
@@ -281,6 +284,7 @@ public:
             std::string newPath = currentPath.string() + "/" + newName;
 
             fs::rename(oldPath, newPath);
+            std::cout << "Успешно переименовано, новое имя " << newName << ".";
         }
         catch (const std::filesystem::filesystem_error& e)
         {
@@ -333,18 +337,6 @@ public:
         }
     }
 
-    // Метод для установки текущего пути
-    void setCurrentPath(const std::string& path)
-    {
-        currentPath = path;
-    }
-
-
-    // Метод для получения текущего пути
-    std::string getCurrentPath() const
-    {
-        return currentPath.string();
-    }
 
     // Метод для перехода в директорию
     void navigateToDirectory(const std::string& directoryName)
@@ -416,7 +408,9 @@ public:
                 if (fs::is_regular_file(entry) && matchMask(entryName, mask))
                 {
                     found = true;
+                    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 12);
                     std::cout << "Найден файл по маске " << mask << ":\n" << entryName << std::endl;
+                    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 15);
                 }
             }
 
@@ -644,7 +638,6 @@ int main()
             break;
         case 'D':
             fileManager.showAllDrives();
-            fileManager.getValidDiskPath();
             fileManager.changeDisk();
             break;
         case '0':
