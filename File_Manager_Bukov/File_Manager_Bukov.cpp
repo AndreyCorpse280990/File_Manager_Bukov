@@ -39,55 +39,13 @@ class DiskManager : public Path
 {
 public:
     // Вывод списка дисков
-    void showAllDrives()
-    {
-        std::vector<std::string> drives;
-
-        DWORD drivesMask = GetLogicalDrives();
-        for (char driveLetter = 'A'; driveLetter <= 'Z'; ++driveLetter)
-        {
-            if (drivesMask & 1)
-            {
-                std::string drivePath = std::string(1, driveLetter) + ":\\";
-                drives.push_back(drivePath);
-            }
-            drivesMask >>= 1;
-        }
-
-        if (!drives.empty()) {
-            std::cout << "Доступные диски:\n";
-            for (const auto& drive : drives)
-            {
-                std::cout << drive << std::endl;
-            }
-        }
-        else {
-            std::cout << "Диски не найдены.\n";
-        }
-    }
+    void showAllDrives();
 
     // Выбор диска
-    std::string getValidDiskPath() {
-        std::string diskPath;
-        std::cout << "Введите имя диска. Например 'C:' - для Windows. '/mnt' - для Linux: ";
-        std::cin >> diskPath;
-
-        if (!fs::exists(diskPath) || !fs::is_directory(diskPath)) {
-            std::cerr << "Ошибка: указанный путь не существует или не является директорией." << std::endl;
-            exit(1);
-        }
-
-        return diskPath;
-    }
+    std::string getValidDiskPath();
 
     // Метод для смены диска
-    void changeDisk()
-    {
-        std::string newDiskPath = getValidDiskPath();
-        setCurrentPath(newDiskPath);
-        std::cout << "Текущий диск изменен на: " << newDiskPath << std::endl;
-    }
-
+    void changeDisk();
 
 };
 
@@ -95,442 +53,37 @@ class FileManager : public DiskManager
 {
 public:
     // Метод для отображения содержимого директории
-    void showContents(bool showSizes = true, const std::string& mask = "")
-    {
-        try
-        {
-            if (!fs::is_empty(currentPath)) // Если папка не пуста
-            {
-                if (fs::exists(currentPath) && fs::is_directory(currentPath))
-                {
-                    std::cout << "Содержимое " << currentPath << ":\n";
-
-                    for (const auto& entry : fs::directory_iterator(currentPath))
-                    {
-                        auto entryPath = entry.path();
-
-                        // Добавлен фильтр по маске
-                        if (mask.empty() || std::regex_match(entryPath.filename().u8string(), std::regex(mask)))
-                        {
-                            try
-                            {
-                                if (fs::is_directory(entryPath))
-                                {
-                                    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_GREEN);
-                                    std::cout << "Папка: " << entryPath.filename().u8string();
-                                }
-                                else
-                                {
-                                    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_GREEN | FOREGROUND_RED);
-                                    std::cout << "Файл: " << entryPath.filename().u8string();
-                                }
-                                if (showSizes)
-                                {
-                                    if (fs::is_regular_file(entryPath))
-                                    {
-                                        int fileSizeB = fs::file_size(entryPath);
-                                        if (fileSizeB >= 1024 * 1024 * 1024)
-                                        {
-                                            double fileSizeGB = static_cast<double>(fileSizeB) / (1024 * 1024 * 1024);
-                                            std::cout << " (Размер: " << fileSizeGB << " GB)";
-                                        }
-                                        else if (fileSizeB >= 1024 * 1024)
-                                        {
-                                            double fileSizeMB = static_cast<double>(fileSizeB) / (1024 * 1024);
-                                            std::cout << " (Размер: " << fileSizeMB << " MB)";
-                                        }
-                                        else if (fileSizeB >= 1024)
-                                        {
-                                            double fileSizeKB = static_cast<double>(fileSizeB) / 1024;
-                                            std::cout << " (Размер: " << fileSizeKB << " KB)";
-                                        }
-                                        else
-                                        {
-                                            std::cout << " (Размер: " << fileSizeB << " байт)";
-                                        }
-                                    }
-                                    else if (fs::is_directory(entryPath))
-                                    {
-                                        double folderSizeGB = calculateFolderSizeGB(entryPath);
-                                        if (folderSizeGB >= 1.0)
-                                        {
-                                            std::cout << " (Размер: " << folderSizeGB << " GB)";
-                                        }
-                                        else
-                                        {
-                                            double folderSizeMB = folderSizeGB * 1024;
-                                            if (folderSizeMB >= 1.0)
-                                            {
-                                                std::cout << " (Размер: " << folderSizeMB << " MB)";
-                                            }
-                                            else
-                                            {
-                                                uintmax_t folderSizeB = static_cast<uintmax_t>(folderSizeMB * 1024);
-                                                std::cout << " (Размер: " << folderSizeB << " байт)";
-                                            }
-                                        }
-                                    }
-                                }
-
-
-
-                                std::cout << std::endl;
-                                SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_GREEN);
-                            }
-                            catch (const std::exception& e)
-                            {
-                                SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED);
-                                std::cerr << "\tОшибка при обработке файла/папки: " << e.what() << std::endl;
-                                SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_GREEN);
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    std::cout << "\tДиректория " << currentPath << " не существует или не является директорией.\n";
-                }
-            }
-            else
-            {
-                std::cerr << "Папка пустая." << std::endl;
-            }
-        }
-        catch (const std::filesystem::filesystem_error& e)
-        {
-            std::cerr << "\tОшибка работы с файловой системой: " << e.what() << std::endl;
-        }
-        catch (const std::exception& e)
-        {
-            std::cerr << "\tНеобработанное исключение: " << e.what() << std::endl;
-        }
-        catch (...)
-        {
-            std::cerr << "\tНеобработанное неизвестное исключение.\n";
-        }
-    }
-
+    void showContents(bool showSizes = true, const std::string& mask = "");
 
     // Метод для создания файла
-    void createFile(const std::string& name)
-    {
-        fs::path filePath = currentPath / name; // проверка на занятость имени файла
-
-        if (!fs::exists(filePath))
-        {
-            std::ofstream file(filePath.string());
-            file.close();
-            std::cout << "Файл успешно создан.\n";
-        }
-        else
-        {
-            std::cout << "Файл с именем " << name << " уже существует. Выберите другое имя.\n";
-        }
-    }
+    void createFile(const std::string& name);
 
     // Метод для удаления объекта (файла или папки)
-    void deleteObject(const std::string& name)
-    {
-        try
-        {
-            std::string objectPath = (currentPath / name).string();
-
-            if (fs::exists(objectPath))
-            {
-                std::cout << "Вы уверены, что хотите удалить объект " << objectPath << "? (y/n): ";
-                char confirmation;
-                std::cin >> confirmation;
-
-                if (confirmation == 'y' || confirmation == 'Y')
-                {
-                    fs::remove_all(objectPath);
-                    std::cout << "Объект успешно удален.\n";
-                }
-                else
-                {
-                    std::cout << "Удаление отменено.\n";
-                }
-            }
-            else
-            {
-                std::cout << "Объект " << objectPath << " не существует.\n";
-            }
-        }
-        catch (const std::filesystem::filesystem_error& e)
-        {
-            std::cerr << "Ошибка работы с файловой системой: " << e.what() << std::endl;
-        }
-        catch (const std::exception& e)
-        {
-            std::cerr << "Необработанное исключение: " << e.what() << std::endl;
-        }
-        catch (...)
-        {
-            std::cerr << "Необработанное неизвестное исключение.\n";
-        }
-    }
-
-
+    void deleteObject(const std::string& name);
 
     // Метод для переименования объекта (файла или папки)
-    void rename(const std::string& oldName, const std::string& newName)
-    {
-        try
-        {
-            std::string oldPath = currentPath.string() + "/" + oldName;
-            std::string newPath = currentPath.string() + "/" + newName;
-
-            fs::rename(oldPath, newPath);
-            std::cout << "Успешно переименовано, новое имя " << newName << ".";
-        }
-        catch (const std::filesystem::filesystem_error& e)
-        {
-            std::cerr << "Ошибка работы с файловой системой: " << e.what() << std::endl;
-        }
-        catch (const std::exception& e)
-        {
-            std::cerr << "Необработанное исключение: " << e.what() << std::endl;
-        }
-        catch (...)
-        {
-            std::cerr << "Необработанное неизвестное исключение.\n";
-        }
-    }
-
+    void rename(const std::string& oldName, const std::string& newName);
 
     // Метод для чтения текстового файла
-    void readTextFile(const std::string& fileName)
-    {
-        size_t dotPosition = fileName.find_last_of(".");
-        if (dotPosition != std::string::npos)
-        {
-            std::string extension = fileName.substr(dotPosition + 1);
-            if (extension == "txt")
-            {
-                std::ifstream file(currentPath.string() + "/" + fileName);
-                if (file.is_open())
-                {
-                    std::string line;
-                    std::cout << "\nСодержимое файла " << fileName << ":\n";
-                    while (std::getline(file, line))
-                    {
-                        std::cout << line << std::endl;
-                    }
-                    file.close();
-                }
-                else
-                {
-                    std::cout << "Не удалось открыть файл " << fileName << " для чтения.\n";
-                }
-            }
-            else
-            {
-                std::cout << "Содержимое файла " << fileName << " не .txt. Расширение: " << extension << std::endl;
-            }
-        }
-        else
-        {
-            std::cout << "Расширение файла не найдено в имени " << fileName << std::endl;
-        }
-    }
-
+    void readTextFile(const std::string& fileName);
 
     // Метод для перехода в директорию
-    void navigateToDirectory(const std::string& directoryName)
-    {
-        std::string newPath = currentPath.string() + "/" + directoryName;
-        if (fs::exists(newPath) && fs::is_directory(newPath))
-        {
-            currentPath = newPath;
-            std::cout << "Переход в директорию: " << currentPath << std::endl;
-        }
-        else
-        {
-            std::cout << "Директория " << newPath << " не существует или не является директорией.\n";
-        }
-    }
-
+    void navigateToDirectory(const std::string& directoryName);
 
     // Метод для перехода на уровень выше
-    void navigateUp()
-    {
-        std::string parentPath = fs::path(currentPath).parent_path().u8string();
-        if (fs::exists(parentPath) && fs::is_directory(parentPath))
-        {
-            currentPath = parentPath;
-            std::cout << "Переход в директорию: " << currentPath << std::endl;
-        }
-        else
-        {
-            std::cout << "Нельзя перейти выше. Текущая директория: " << currentPath << std::endl;
-        }
-    }
+    void navigateUp();
 
     // Метод для вычисления размера папки в гигабайтах
-    double calculateFolderSizeGB(const fs::path& folderPath)
-    {
-        uintmax_t sizeBytes = 0;
-
-        for (const auto& entry : fs::recursive_directory_iterator(folderPath))
-        {
-            if (fs::is_regular_file(entry))
-            {
-                sizeBytes += fs::file_size(entry);
-            }
-        }
-
-        double sizeGB = static_cast<double>(sizeBytes) / (1024 * 1024 * 1024);
-        return sizeGB;
-    }
-
+    double calculateFolderSizeGB(const fs::path& folderPath);
 
     // Метод для поиска файлов по маске
-    void searchByMask()
-    {
-        try
-        {
-            std::string mask;
-            std::cout << "Введите маску файла (например, *.txt): ";
-            std::cin >> mask;
-            fs::path currentPathObj(currentPath);
-
-            // lexically_normal() для обработки символов маски
-            fs::path searchPath = currentPathObj.lexically_normal();
-
-            bool found = false;
-            for (const auto& entry : fs::directory_iterator(searchPath))
-            {
-                std::string entryName = entry.path().filename().u8string();
-
-                if (fs::is_regular_file(entry) && matchMask(entryName, mask))
-                {
-                    found = true;
-                    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 12);
-                    std::cout << "Найден файл по маске " << mask << ":\n" << entryName << std::endl;
-                    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 15);
-                }
-            }
-
-            if (!found)
-            {
-                std::cout << "Файлы по маске " << mask << " не найдены в директории " << currentPath << ".\n";
-            }
-        }
-        catch (const std::filesystem::filesystem_error& e)
-        {
-            std::cerr << "\tОшибка работы с файловой системой: " << e.what() << std::endl;
-        }
-        catch (const std::exception& e)
-        {
-            std::cerr << "\tНеобработанное исключение: " << e.what() << std::endl;
-        }
-        catch (...)
-        {
-            std::cerr << "\tНеобработанное неизвестное исключение.\n";
-        }
-    }
+    void searchByMask();
 
     // Метод для поиска файлов по маске в подпапках
-    void searchByMaskInSubfolders()
-    {
-        try
-        {
-            std::string mask;
-            std::cout << "Введите маску файла (например, *.txt): ";
-            std::cin >> mask;
-
-            bool found = false;
-            int errorCount = 0;  //  счетчик ошибок
-            int totalCount = 0;  //  счетчик всех файлов
-
-            for (const auto& entry : fs::recursive_directory_iterator(currentPath, fs::directory_options::skip_permission_denied))
-            {
-                try
-                {
-                    std::string entryName = entry.path().filename().u8string();
-
-                    // проверка статуса файла
-                    if (fs::status(entry).permissions() != fs::perms::none &&
-                        fs::is_regular_file(entry) &&
-                        matchMask(entryName, mask))
-                    {
-                        found = true;
-                        std::cout << "Найден файл " << std::endl;
-                        std::cout << "  Имя файла: " << entryName << std::endl;
-                        std::cout << "  Путь: " << fs::relative(entry.path(), currentPath).u8string() << std::endl;
-                        ++totalCount;  // ++ счетчик всех файлов
-                    }
-                }
-                catch (const std::filesystem::filesystem_error& fe)
-                {
-                    // Обработка ошибок файловой системы (например, "Отказано в доступе")
-                    std::cerr << "Ошибка работы с файловой системой: " << fe.what() << std::endl;
-                    ++errorCount;  // ++ счетчик ошибок
-                }
-            }
-
-            if (!found)
-            {
-                std::cout << "Файлы по маске " << mask << " не найдены в подпапках директории " << currentPath << ".\n";
-            }
-            SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 12);
-            std::cout << "Найдено файлов: " << totalCount << std::endl;
-            SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 15);
-            std::cout << "Не удалось считать из-за ошибок доступа: " << errorCount << std::endl;
-        }
-        catch (const std::filesystem::filesystem_error& e)
-        {
-            std::cerr << "Ошибка работы с файловой системой: " << e.what() << std::endl;
-        }
-        catch (const std::exception& e)
-        {
-            std::cerr << "Необработанное исключение: " << e.what() << std::endl;
-        }
-        catch (...)
-        {
-            std::cerr << "Необработанное неизвестное исключение.\n";
-        }
-    }
+    void searchByMaskInSubfolders();
 
     // Вспомогательная функция для проверки соответствия строки маске
-    bool matchMask(const std::string& str, const std::string& mask)
-    {
-        size_t i = 0, j = 0;
-        while (i < str.size() && j < mask.size())
-        {
-            if (mask[j] == '*')
-            {
-                size_t k = j + 1;
-                while (k < mask.size() && mask[k] != '*')
-                    ++k;
-
-                size_t len = k - j - 1;
-                if (len == 0) // '*' в маске означает любой символ
-                {
-                    ++j;
-                    continue;
-                }
-
-                size_t pos = str.find(mask.substr(j + 1, len), i);
-                if (pos == std::string::npos)
-                    return false;
-
-                i = pos + len;
-                j = k;
-            }
-            else if (mask[j] == str[i] || mask[j] == '?')
-            {
-                ++i;
-                ++j;
-            }
-            else
-            {
-                return false;
-            }
-        }
-
-        return (i == str.size() && j == mask.size());
-    }
+    bool matchMask(const std::string& str, const std::string& mask);
 
 };
 
@@ -648,3 +201,490 @@ int main()
 
     return 0;
 }
+
+
+void DiskManager::showAllDrives()
+
+{
+    std::vector<std::string> drives;
+
+    DWORD drivesMask = GetLogicalDrives();
+    for (char driveLetter = 'A'; driveLetter <= 'Z'; ++driveLetter)
+    {
+        if (drivesMask & 1)
+        {
+            std::string drivePath = std::string(1, driveLetter) + ":\\";
+            drives.push_back(drivePath);
+        }
+        drivesMask >>= 1;
+    }
+
+    if (!drives.empty()) {
+        std::cout << "Доступные диски:\n";
+        for (const auto& drive : drives)
+        {
+            std::cout << drive << std::endl;
+        }
+    }
+    else {
+        std::cout << "Диски не найдены.\n";
+    }
+}
+
+std::string DiskManager::getValidDiskPath()
+{
+    std::string diskPath;
+    std::cout << "Введите имя диска. Например 'C:' - для Windows. '/mnt' - для Linux: ";
+    std::cin >> diskPath;
+
+    if (!fs::exists(diskPath) || !fs::is_directory(diskPath)) {
+        std::cerr << "Ошибка: указанный путь не существует или не является директорией." << std::endl;
+        exit(1);
+    }
+
+    return diskPath;
+}
+
+void DiskManager::changeDisk()
+{
+    std::string newDiskPath = getValidDiskPath();
+    setCurrentPath(newDiskPath);
+    std::cout << "Текущий диск изменен на: " << newDiskPath << std::endl;
+}
+
+void FileManager::showContents(bool showSizes, const std::string& mask)
+
+{
+    try
+    {
+        if (!fs::is_empty(currentPath)) // Если папка не пуста
+        {
+            if (fs::exists(currentPath) && fs::is_directory(currentPath))
+            {
+                std::cout << "Содержимое " << currentPath << ":\n";
+
+                for (const auto& entry : fs::directory_iterator(currentPath))
+                {
+                    auto entryPath = entry.path();
+
+                    // Добавлен фильтр по маске
+                    if (mask.empty() || std::regex_match(entryPath.filename().u8string(), std::regex(mask)))
+                    {
+                        try
+                        {
+                            if (fs::is_directory(entryPath))
+                            {
+                                SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_GREEN);
+                                std::cout << "Папка: " << entryPath.filename().u8string();
+                            }
+                            else
+                            {
+                                SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_GREEN | FOREGROUND_RED);
+                                std::cout << "Файл: " << entryPath.filename().u8string();
+                            }
+                            if (showSizes)
+                            {
+                                if (fs::is_regular_file(entryPath))
+                                {
+                                    int fileSizeB = fs::file_size(entryPath);
+                                    if (fileSizeB >= 1024 * 1024 * 1024)
+                                    {
+                                        double fileSizeGB = static_cast<double>(fileSizeB) / (1024 * 1024 * 1024);
+                                        std::cout << " (Размер: " << fileSizeGB << " GB)";
+                                    }
+                                    else if (fileSizeB >= 1024 * 1024)
+                                    {
+                                        double fileSizeMB = static_cast<double>(fileSizeB) / (1024 * 1024);
+                                        std::cout << " (Размер: " << fileSizeMB << " MB)";
+                                    }
+                                    else if (fileSizeB >= 1024)
+                                    {
+                                        double fileSizeKB = static_cast<double>(fileSizeB) / 1024;
+                                        std::cout << " (Размер: " << fileSizeKB << " KB)";
+                                    }
+                                    else
+                                    {
+                                        std::cout << " (Размер: " << fileSizeB << " байт)";
+                                    }
+                                }
+                                else if (fs::is_directory(entryPath))
+                                {
+                                    double folderSizeGB = calculateFolderSizeGB(entryPath);
+                                    if (folderSizeGB >= 1.0)
+                                    {
+                                        std::cout << " (Размер: " << folderSizeGB << " GB)";
+                                    }
+                                    else
+                                    {
+                                        double folderSizeMB = folderSizeGB * 1024;
+                                        if (folderSizeMB >= 1.0)
+                                        {
+                                            std::cout << " (Размер: " << folderSizeMB << " MB)";
+                                        }
+                                        else
+                                        {
+                                            uintmax_t folderSizeB = static_cast<uintmax_t>(folderSizeMB * 1024);
+                                            std::cout << " (Размер: " << folderSizeB << " байт)";
+                                        }
+                                    }
+                                }
+                            }
+
+
+
+                            std::cout << std::endl;
+                            SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_GREEN);
+                        }
+                        catch (const std::exception& e)
+                        {
+                            SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED);
+                            std::cerr << "\tОшибка при обработке файла/папки: " << e.what() << std::endl;
+                            SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_GREEN);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                std::cout << "\tДиректория " << currentPath << " не существует или не является директорией.\n";
+            }
+        }
+        else
+        {
+            std::cerr << "Папка пустая." << std::endl;
+        }
+    }
+    catch (const std::filesystem::filesystem_error& e)
+    {
+        std::cerr << "\tОшибка работы с файловой системой: " << e.what() << std::endl;
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << "\tНеобработанное исключение: " << e.what() << std::endl;
+    }
+    catch (...)
+    {
+        std::cerr << "\tНеобработанное неизвестное исключение.\n";
+    }
+}
+
+void FileManager::createFile(const std::string& name)
+
+{
+    fs::path filePath = currentPath / name; // проверка на занятость имени файла
+
+    if (!fs::exists(filePath))
+    {
+        std::ofstream file(filePath.string());
+        file.close();
+        std::cout << "Файл успешно создан.\n";
+    }
+    else
+    {
+        std::cout << "Файл с именем " << name << " уже существует. Выберите другое имя.\n";
+    }
+}
+
+void FileManager::deleteObject(const std::string& name)
+
+{
+    try
+    {
+        std::string objectPath = (currentPath / name).string();
+
+        if (fs::exists(objectPath))
+        {
+            std::cout << "Вы уверены, что хотите удалить объект " << objectPath << "? (y/n): ";
+            char confirmation;
+            std::cin >> confirmation;
+
+            if (confirmation == 'y' || confirmation == 'Y')
+            {
+                fs::remove_all(objectPath);
+                std::cout << "Объект успешно удален.\n";
+            }
+            else
+            {
+                std::cout << "Удаление отменено.\n";
+            }
+        }
+        else
+        {
+            std::cout << "Объект " << objectPath << " не существует.\n";
+        }
+    }
+    catch (const std::filesystem::filesystem_error& e)
+    {
+        std::cerr << "Ошибка работы с файловой системой: " << e.what() << std::endl;
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << "Необработанное исключение: " << e.what() << std::endl;
+    }
+    catch (...)
+    {
+        std::cerr << "Необработанное неизвестное исключение.\n";
+    }
+}
+
+void FileManager::rename(const std::string& oldName, const std::string& newName)
+
+{
+    try
+    {
+        std::string oldPath = currentPath.string() + "/" + oldName;
+        std::string newPath = currentPath.string() + "/" + newName;
+
+        fs::rename(oldPath, newPath);
+        std::cout << "Успешно переименовано, новое имя " << newName << ".";
+    }
+    catch (const std::filesystem::filesystem_error& e)
+    {
+        std::cerr << "Ошибка работы с файловой системой: " << e.what() << std::endl;
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << "Необработанное исключение: " << e.what() << std::endl;
+    }
+    catch (...)
+    {
+        std::cerr << "Необработанное неизвестное исключение.\n";
+    }
+}
+
+void FileManager::readTextFile(const std::string& fileName)
+
+{
+    size_t dotPosition = fileName.find_last_of(".");
+    if (dotPosition != std::string::npos)
+    {
+        std::string extension = fileName.substr(dotPosition + 1);
+        if (extension == "txt")
+        {
+            std::ifstream file(currentPath.string() + "/" + fileName);
+            if (file.is_open())
+            {
+                std::string line;
+                std::cout << "\nСодержимое файла " << fileName << ":\n";
+                while (std::getline(file, line))
+                {
+                    std::cout << line << std::endl;
+                }
+                file.close();
+            }
+            else
+            {
+                std::cout << "Не удалось открыть файл " << fileName << " для чтения.\n";
+            }
+        }
+        else
+        {
+            std::cout << "Содержимое файла " << fileName << " не .txt. Расширение: " << extension << std::endl;
+        }
+    }
+    else
+    {
+        std::cout << "Расширение файла не найдено в имени " << fileName << std::endl;
+    }
+}
+
+void FileManager::navigateToDirectory(const std::string& directoryName)
+
+{
+    std::string newPath = currentPath.string() + "/" + directoryName;
+    if (fs::exists(newPath) && fs::is_directory(newPath))
+    {
+        currentPath = newPath;
+        std::cout << "Переход в директорию: " << currentPath << std::endl;
+    }
+    else
+    {
+        std::cout << "Директория " << newPath << " не существует или не является директорией.\n";
+    }
+}
+
+void FileManager::navigateUp()
+{
+    std::string parentPath = fs::path(currentPath).parent_path().u8string();
+    if (!parentPath.empty())
+    {
+        if (fs::exists(parentPath) && fs::is_directory(parentPath))
+        {
+            currentPath = parentPath;
+            std::cout << "Переход в директорию: " << currentPath << std::endl;
+        }
+        else
+        {
+            std::cout << "Нельзя перейти выше. Текущая директория: " << currentPath << std::endl;
+        }
+    }
+    else
+    {
+        std::cout << "Нельзя перейти выше. Текущая директория: " << currentPath << std::endl;
+    }
+}
+
+double FileManager::calculateFolderSizeGB(const fs::path& folderPath)
+
+{
+    uintmax_t sizeBytes = 0;
+
+    for (const auto& entry : fs::recursive_directory_iterator(folderPath))
+    {
+        if (fs::is_regular_file(entry))
+        {
+            sizeBytes += fs::file_size(entry);
+        }
+    }
+
+    double sizeGB = static_cast<double>(sizeBytes) / (1024 * 1024 * 1024);
+    return sizeGB;
+}
+
+void FileManager::searchByMask()
+
+{
+    try
+    {
+        std::string mask;
+        std::cout << "Введите маску файла (например, *.txt): ";
+        std::cin >> mask;
+        fs::path currentPathObj(currentPath);
+
+        // lexically_normal() для обработки символов маски
+        fs::path searchPath = currentPathObj.lexically_normal();
+
+        bool found = false;
+        for (const auto& entry : fs::directory_iterator(searchPath))
+        {
+            std::string entryName = entry.path().filename().u8string();
+
+            if (fs::is_regular_file(entry) && matchMask(entryName, mask))
+            {
+                found = true;
+                SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 12);
+                std::cout << "Найден файл по маске " << mask << ":\n" << entryName << std::endl;
+                SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 15);
+            }
+        }
+
+        if (!found)
+        {
+            std::cout << "Файлы по маске " << mask << " не найдены в директории " << currentPath << ".\n";
+        }
+    }
+    catch (const std::filesystem::filesystem_error& e)
+    {
+        std::cerr << "\tОшибка работы с файловой системой: " << e.what() << std::endl;
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << "\tНеобработанное исключение: " << e.what() << std::endl;
+    }
+    catch (...)
+    {
+        std::cerr << "\tНеобработанное неизвестное исключение.\n";
+    }
+}
+
+void FileManager::searchByMaskInSubfolders()
+{
+    try
+    {
+        std::string mask;
+        std::cout << "Введите маску файла (например, *.txt): ";
+        std::cin >> mask;
+
+        bool found = false;
+        int errorCount = 0;  //  счетчик ошибок
+        int totalCount = 0;  //  счетчик всех файлов
+
+        for (const auto& entry : fs::recursive_directory_iterator(currentPath, fs::directory_options::skip_permission_denied))
+        {
+            try
+            {
+                std::string entryName = entry.path().filename().u8string();
+
+                // проверка статуса файла
+                if (fs::status(entry).permissions() != fs::perms::none &&
+                    fs::is_regular_file(entry) &&
+                    matchMask(entryName, mask))
+                {
+                    found = true;
+                    std::cout << "Найден файл " << std::endl;
+                    std::cout << "  Имя файла: " << entryName << std::endl;
+                    std::cout << "  Путь: " << fs::relative(entry.path(), currentPath).u8string() << std::endl;
+                    ++totalCount;  // ++ счетчик всех файлов
+                }
+            }
+            catch (const std::filesystem::filesystem_error& fe)
+            {
+                // Обработка ошибок файловой системы (например, "Отказано в доступе")
+                std::cerr << "Ошибка работы с файловой системой: " << fe.what() << std::endl;
+                ++errorCount;  // ++ счетчик ошибок
+            }
+        }
+
+        if (!found)
+        {
+            std::cout << "Файлы по маске " << mask << " не найдены в подпапках директории " << currentPath << ".\n";
+        }
+        SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 12);
+        std::cout << "Найдено файлов: " << totalCount << std::endl;
+        SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 15);
+        std::cout << "Не удалось считать из-за ошибок доступа: " << errorCount << std::endl;
+    }
+    catch (const std::filesystem::filesystem_error& e)
+    {
+        std::cerr << "Ошибка работы с файловой системой: " << e.what() << std::endl;
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << "Необработанное исключение: " << e.what() << std::endl;
+    }
+    catch (...)
+    {
+        std::cerr << "Необработанное неизвестное исключение.\n";
+    }
+}
+
+bool FileManager::matchMask(const std::string& str, const std::string& mask)
+
+{
+    size_t i = 0, j = 0;
+    while (i < str.size() && j < mask.size())
+    {
+        if (mask[j] == '*')
+        {
+            size_t k = j + 1;
+            while (k < mask.size() && mask[k] != '*')
+                ++k;
+
+            size_t len = k - j - 1;
+            if (len == 0) // '*' в маске означает любой символ
+            {
+                ++j;
+                continue;
+            }
+
+            size_t pos = str.find(mask.substr(j + 1, len), i);
+            if (pos == std::string::npos)
+                return false;
+
+            i = pos + len;
+            j = k;
+        }
+        else if (mask[j] == str[i] || mask[j] == '?')
+        {
+            ++i;
+            ++j;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    return (i == str.size() && j == mask.size());
+}
+
