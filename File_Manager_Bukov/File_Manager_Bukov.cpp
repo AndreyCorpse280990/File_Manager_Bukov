@@ -4,7 +4,6 @@
 #include <filesystem>
 #include <fstream>
 #include <regex>
-#include <vcruntime_typeinfo.h>
 #include <windows.h> 
 
 namespace fs = std::filesystem;
@@ -208,11 +207,14 @@ void DiskManager::showAllDrives()
 {
     std::vector<std::string> drives;
 
+    //битовая маску, представляющую доступные логические диски
     DWORD drivesMask = GetLogicalDrives();
     for (char driveLetter = 'A'; driveLetter <= 'Z'; ++driveLetter)
     {
+        // Проверяем, установлен ли соответствующий бит в маске
         if (drivesMask & 1)
         {
+            // добавление диска в вектор
             std::string drivePath = std::string(1, driveLetter) + ":\\";
             drives.push_back(drivePath);
         }
@@ -237,6 +239,7 @@ std::string DiskManager::getValidDiskPath()
     std::cout << "Введите имя диска. Например 'C:' - для Windows. '/mnt' - для Linux: ";
     std::cin >> diskPath;
 
+    // проверка, существует ли указанный путь и является ли он директорией
     if (!fs::exists(diskPath) || !fs::is_directory(diskPath)) {
         std::cerr << "Ошибка: указанный путь не существует или не является директорией." << std::endl;
         exit(1);
@@ -282,10 +285,12 @@ void FileManager::showContents(bool showSizes, const std::string& mask)
                                 SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_GREEN | FOREGROUND_RED);
                                 std::cout << "Файл: " << entryPath.filename().u8string();
                             }
+                            // Отображение размера, если флаг showSizes установлен
                             if (showSizes)
                             {
                                 if (fs::is_regular_file(entryPath))
                                 {
+                                    // Определение размер файла в байтах и конвертируем в GB, MB, KB или байты в зависимости от размера
                                     int fileSizeB = fs::file_size(entryPath);
                                     if (fileSizeB >= 1024 * 1024 * 1024)
                                     {
@@ -309,6 +314,7 @@ void FileManager::showContents(bool showSizes, const std::string& mask)
                                 }
                                 else if (fs::is_directory(entryPath))
                                 {
+                                    // Определение размера папки в байтах и конвертируем в GB, MB, KB или байты в зависимости от размера
                                     double folderSizeGB = calculateFolderSizeGB(entryPath);
                                     if (folderSizeGB >= 1.0)
                                     {
@@ -390,8 +396,10 @@ void FileManager::deleteObject(const std::string& name)
 {
     try
     {
+        //  путь к объекту, объединяя текущий путь с именем объекта
         std::string objectPath = (currentPath / name).string();
 
+        // проверка, существует ли объект по указанному пути
         if (fs::exists(objectPath))
         {
             std::cout << "Вы уверены, что хотите удалить объект " << objectPath << "? (y/n): ";
@@ -435,6 +443,7 @@ void FileManager::rename(const std::string& oldName, const std::string& newName)
         std::string oldPath = currentPath.string() + "/" + oldName;
         std::string newPath = currentPath.string() + "/" + newName;
 
+        // std::filesystem::rename для переименования файла
         fs::rename(oldPath, newPath);
         std::cout << "Успешно переименовано, новое имя " << newName << ".";
     }
@@ -455,15 +464,20 @@ void FileManager::rename(const std::string& oldName, const std::string& newName)
 void FileManager::readTextFile(const std::string& fileName)
 
 {
+    // поиск последней точки в имени файда
     size_t dotPosition = fileName.find_last_of(".");
+    // найдена ли точка в имени файла
     if (dotPosition != std::string::npos)
     {
+        // получение расширение файла, начиная с символа после точки
         std::string extension = fileName.substr(dotPosition + 1);
+        // является ли расширение файла "txt"
         if (extension == "txt")
         {
             std::ifstream file(currentPath.string() + "/" + fileName);
             if (file.is_open())
             {
+                // вывод содержимого файла построчно
                 std::string line;
                 std::cout << "\nСодержимое файла " << fileName << ":\n";
                 while (std::getline(file, line))
@@ -491,6 +505,7 @@ void FileManager::readTextFile(const std::string& fileName)
 void FileManager::navigateToDirectory(const std::string& directoryName)
 
 {
+    // Формирование нового пути, объединяя текущий путь и имя целевой директории
     std::string newPath = currentPath.string() + "/" + directoryName;
     if (fs::exists(newPath) && fs::is_directory(newPath))
     {
@@ -505,6 +520,7 @@ void FileManager::navigateToDirectory(const std::string& directoryName)
 
 void FileManager::navigateUp()
 {
+    // путь к родительской директории текущего пути
     std::string parentPath = fs::path(currentPath).parent_path().u8string();
     if (!parentPath.empty())
     {
@@ -527,8 +543,10 @@ void FileManager::navigateUp()
 double FileManager::calculateFolderSizeGB(const fs::path& folderPath)
 
 {
+    //  переменная для хранения общего размера папки в байтах.
     uintmax_t sizeBytes = 0;
 
+    // Итерация по всем файлам и подпапкам внутри указанной директории.
     for (const auto& entry : fs::recursive_directory_iterator(folderPath))
     {
         if (fs::is_regular_file(entry))
@@ -557,8 +575,10 @@ void FileManager::searchByMask()
         bool found = false;
         for (const auto& entry : fs::directory_iterator(searchPath))
         {
+            // получение имя файла из пути
             std::string entryName = entry.path().filename().u8string();
 
+            // является ли элемент обычным файлом и соответствует ли маске
             if (fs::is_regular_file(entry) && matchMask(entryName, mask))
             {
                 found = true;
@@ -605,7 +625,7 @@ void FileManager::searchByMaskInSubfolders()
             {
                 std::string entryName = entry.path().filename().u8string();
 
-                // проверка статуса файла
+                // проверка статуса файла.должен иметь права, быть обычным файлом и соответствовать маске
                 if (fs::status(entry).permissions() != fs::perms::none &&
                     fs::is_regular_file(entry) &&
                     matchMask(entryName, mask))
@@ -654,26 +674,33 @@ bool FileManager::matchMask(const std::string& str, const std::string& mask)
     size_t i = 0, j = 0;
     while (i < str.size() && j < mask.size())
     {
+        // Если текущий символ в маске - '*', поиск следующго символа '*'.
         if (mask[j] == '*')
         {
             size_t k = j + 1;
+            // поиск следующего символа '*' в маске.
             while (k < mask.size() && mask[k] != '*')
                 ++k;
 
+            // длину подстроки между двумя символами '*'.
             size_t len = k - j - 1;
-            if (len == 0) // '*' в маске означает любой символ
+            if (len == 0) // Если длина равна 0, '*' в маске означает любой символ.
             {
-                ++j;
+                ++j; // переход к следующему символу в маске.
                 continue;
             }
-
+            // поиск подстроки в строке, соответствующую выделенной подстроке в маске.
             size_t pos = str.find(mask.substr(j + 1, len), i);
             if (pos == std::string::npos)
                 return false;
 
+            // обновление индексов для продолжения сравнения.
             i = pos + len;
             j = k;
         }
+
+        // Если текущий символ в маске совпадает с текущим символом в строке или является '?',
+        // далее к следующему символу в строке и маске.
         else if (mask[j] == str[i] || mask[j] == '?')
         {
             ++i;
@@ -684,7 +711,6 @@ bool FileManager::matchMask(const std::string& str, const std::string& mask)
             return false;
         }
     }
-
+    // Если достигнут конец и строки, и маски, то  true.
     return (i == str.size() && j == mask.size());
 }
-
